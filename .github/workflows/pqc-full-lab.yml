@@ -290,10 +290,16 @@ jobs:
           print(f'Failed: {failed}')
           
           # At minimum, we need KEM and signature tests to pass
-          kem_pass = any(r['status'] == 'PASS' and 'KEM' in r['test_name'] 
-                        for r in results if 'Key Generation' in r['test_name'])
-          sig_pass = any(r['status'] == 'PASS' and 'DSA' in r['test_name']
-                        for r in results if 'Key Generation' in r['test_name'])
+            kem_pass = any(
+              r['status'] == 'PASS'
+              for r in results
+              if 'KEM' in r['test_name'] and 'KeyGen' in r['test_name']
+            )
+            sig_pass = any(
+              r['status'] == 'PASS'
+              for r in results
+              if 'DSA' in r['test_name'] and 'KeyGen' in r['test_name']
+            )
           
           assert kem_pass, 'No KEM key generation test passed'
           assert sig_pass, 'No signature key generation test passed'
