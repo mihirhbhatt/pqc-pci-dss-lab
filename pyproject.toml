@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "pqc-pci-dss-lab"
+version = "1.0.0"
+description = "Post-Quantum Cryptography Lab: NIST FIPS 203/204/205 + PCI-DSS v4.0"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short --timeout=120"
