@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  pqc-lab:
+    build: .
+    volumes:
+      - ./evidence:/lab/evidence
+      - ./reports:/lab/reports
+    environment:
+      - EVIDENCE_DIR=/lab/evidence
+      - REPORTS_DIR=/lab/reports
+    command: make all
+
+  pqc-lab-single:
+    build: .
+    volumes:
+      - ./evidence:/lab/evidence
+      - ./reports:/lab/reports
+    environment:
+      - EVIDENCE_DIR=/lab/evidence
+      - REPORTS_DIR=/lab/reports
+    profiles:
+      - single
+    command: make lab2

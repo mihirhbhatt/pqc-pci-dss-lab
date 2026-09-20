@@ -1,0 +1,96 @@
+# Nightly regression — catches dependency changes and algorithm availability shifts
+name: "PQC Nightly Regression"
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # 3 AM UTC daily
+  workflow_dispatch:
+
+jobs:
+  nightly-regression:
+    name: "🌙 Nightly PQC Regression"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install all dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libssl-dev
+          
+          # Build liboqs
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs && mkdir build && cd build
+          cmake -GNinja -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$HOME/liboqs-install ..
+          ninja && ninja install
+          echo "$HOME/liboqs-install/lib" | sudo tee /etc/ld.so.conf.d/liboqs.conf
+          sudo ldconfig
+          
+          pip install -r requirements.txt
+          
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs-python.git
+          cd liboqs-python && pip install .
+
+      - name: Run all tests
+        run: |
+          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml 2>&1 | tee nightly-results.log
+        env:
+          LD_LIBRARY_PATH: "${{ env.HOME }}/liboqs-install/lib"
+
+      - name: Run algorithm availability check
+        run: |
+          python -c "
+          import oqs
+          import json
+          from datetime import datetime
+          
+          report = {
+              'timestamp': datetime.now().isoformat(),
+              'liboqs_version': oqs.oqs_version(),
+              'kem_mechanisms': oqs.get_enabled_kem_mechanisms(),
+              'sig_mechanisms': oqs.get_enabled_sig_mechanisms(),
+              'kem_count': len(oqs.get_enabled_kem_mechanisms()),
+              'sig_count': len(oqs.get_enabled_sig_mechanisms()),
+              'target_kems_available': {
+                  name: name in oqs.get_enabled_kem_mechanisms()
+                  for name in ['ML-KEM-512', 'ML-KEM-768', 'ML-KEM-1024',
+                               'Kyber512', 'Kyber768', 'Kyber1024']
+              },
+              'target_sigs_available': {
+                  name: name in oqs.get_enabled_sig_mechanisms()
+                  for name in ['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87',
+                               'Dilithium2', 'Dilithium3', 'Dilithium5']
+              }
+          }
+          
+          with open('algorithm-availability.json', 'w') as f:
+              json.dump(report, f, indent=2)
+          
+          print(json.dumps(report, indent=2))
+          "
+        env:
+          LD_LIBRARY_PATH: "${{ env.HOME }}/liboqs-install/lib"
+
+      - name: Upload nightly results
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ github.run_number }}
+          path: |
+            nightly-results.log
+            test-results.xml
+            algorithm-availability.json
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Nightly PQC regression failed. Check algorithm availability and dependency changes."

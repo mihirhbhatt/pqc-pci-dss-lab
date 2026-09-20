@@ -1,0 +1,668 @@
+# =============================================================================
+# PQC + PCI-DSS Compliance Lab — Full Pipeline
+# Runs all 6 labs, collects evidence, publishes artifacts and dashboard
+# =============================================================================
+name: "PQC-PCI-DSS Full Lab Pipeline"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      lab_selection:
+        description: "Which labs to run (all, lab1, lab2, lab3, lab4, lab5, lab6)"
+        required: false
+        default: "all"
+      parameter_set:
+        description: "PQC parameter set level (standard, high, all)"
+        required: false
+        default: "all"
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  EVIDENCE_DIR: "evidence"
+  REPORTS_DIR: "reports"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read
+
+jobs:
+  # ===========================================================================
+  # JOB 1: Build Environment and Install Dependencies
+  # ===========================================================================
+  setup:
+    name: "🔧 Setup PQC Environment"
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-deps.outputs.cache-hit }}
+      liboqs-version: ${{ steps.versions.outputs.liboqs }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache Python dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/liboqs-install
+          key: pqc-deps-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pqc-deps-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libssl-dev \
+            openssl \
+            astyle \
+            jq
+
+      - name: Build and install liboqs
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          cd /tmp
+          git clone --depth 1 --branch main https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs
+          mkdir build && cd build
+          cmake -GNinja \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_INSTALL_PREFIX=$HOME/liboqs-install \
+            -DOQS_BUILD_ONLY_LIB=ON \
+            ..
+          ninja
+          ninja install
+          echo "$HOME/liboqs-install/lib" | sudo tee /etc/ld.so.conf.d/liboqs.conf
+          sudo ldconfig
+
+      - name: Configure liboqs paths
+        run: |
+          echo "LD_LIBRARY_PATH=$HOME/liboqs-install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$HOME/liboqs-install" >> $GITHUB_ENV
+          echo "$HOME/liboqs-install/lib" | sudo tee /etc/ld.so.conf.d/liboqs.conf
+          sudo ldconfig
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+
+      - name: Install liboqs-python
+        run: |
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs-python.git
+          cd liboqs-python
+          pip install .
+
+      - name: Verify PQC installation
+        id: versions
+        run: |
+          python -c "
+          import oqs
+          print('liboqs-python installed successfully')
+          kems = oqs.get_enabled_kem_mechanisms()
+          sigs = oqs.get_enabled_sig_mechanisms()
+          print(f'Available KEMs: {len(kems)}')
+          print(f'Available Signatures: {len(sigs)}')
+          print(f'Sample KEMs: {kems[:5]}')
+          print(f'Sample Sigs: {sigs[:5]}')
+          " | tee /tmp/pqc-verify.log
+
+          echo "liboqs=$(python -c 'import oqs; print(oqs.oqs_version())')" >> $GITHUB_OUTPUT
+
+      - name: Upload environment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pqc-environment-info
+          path: /tmp/pqc-verify.log
+          retention-days: 30
+
+  # ===========================================================================
+  # JOB 2: Lab 1 — Standards Mapping
+  # ===========================================================================
+  lab1-standards-mapping:
+    name: "📋 Lab 1: NIST PQC ↔ PCI-DSS Mapping"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab1' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Lab 1 — Standards Mapping
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab1_standards_mapping 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab1_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate Lab 1 outputs
+        run: |
+          echo "--- Validating Lab 1 Evidence ---"
+
+          # Check JSON output exists and is valid
+          if [ ! -f "${{ env.EVIDENCE_DIR }}/lab1_pqc_pcidss_alignment.json" ]; then
+            echo "FAIL: Alignment JSON not found"
+            exit 1
+          fi
+
+          # Validate JSON structure
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab1_pqc_pcidss_alignment.json') as f:
+              data = json.load(f)
+          
+          assert 'alignments' in data, 'Missing alignments'
+          assert 'algorithm_decisions' in data, 'Missing algorithm decisions'
+          assert len(data['alignments']) >= 7, f'Expected >=7 alignments, got {len(data[\"alignments\"])}'
+          assert len(data['algorithm_decisions']) >= 5, f'Expected >=5 decisions, got {len(data[\"algorithm_decisions\"])}'
+          
+          # Verify PCI-DSS requirements covered
+          pci_reqs = set()
+          for a in data['alignments']:
+              pci_reqs.add(a['pci_req'])
+          
+          required_reqs = {'4.2.1', '3.5.1', '3.6.1', '12.3.3'}
+          missing = required_reqs - pci_reqs
+          assert not missing, f'Missing PCI-DSS requirements: {missing}'
+          
+          print(f'✓ {len(data[\"alignments\"])} alignments validated')
+          print(f'✓ {len(data[\"algorithm_decisions\"])} decisions validated')
+          print(f'✓ PCI-DSS requirements covered: {sorted(pci_reqs)}')
+          print('Lab 1 validation PASSED')
+          "
+
+      - name: Upload Lab 1 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab1-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 3: Lab 2 — Algorithm Testing
+  # ===========================================================================
+  lab2-algorithm-testing:
+    name: "🔬 Lab 2: ML-KEM + ML-DSA Testing"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab2' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libssl-dev
+
+      - name: Build and install liboqs
+        run: |
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs && mkdir build && cd build
+          cmake -GNinja -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$HOME/liboqs-install ..
+          ninja && ninja install
+          echo "$HOME/liboqs-install/lib" | sudo tee /etc/ld.so.conf.d/liboqs.conf
+          sudo ldconfig
+          echo "LD_LIBRARY_PATH=$HOME/liboqs-install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs-python.git
+          cd liboqs-python && pip install .
+
+      - name: Run Lab 2 — Algorithm Testing
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab2_algorithm_testing 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab2_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate Lab 2 outputs
+        run: |
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab2_algorithm_test_evidence.json') as f:
+              data = json.load(f)
+          
+          results = data['test_results']
+          passed = sum(1 for r in results if r['status'] == 'PASS')
+          failed = sum(1 for r in results if r['status'] == 'FAIL')
+          
+          print(f'Total tests: {len(results)}')
+          print(f'Passed: {passed}')
+          print(f'Failed: {failed}')
+          
+          # At minimum, we need KEM and signature tests to pass
+          kem_pass = any(r['status'] == 'PASS' and 'KEM' in r['test_name'] 
+                        for r in results if 'Key Generation' in r['test_name'])
+          sig_pass = any(r['status'] == 'PASS' and 'DSA' in r['test_name']
+                        for r in results if 'Key Generation' in r['test_name'])
+          
+          assert kem_pass, 'No KEM key generation test passed'
+          assert sig_pass, 'No signature key generation test passed'
+          assert failed == 0, f'{failed} tests failed'
+          
+          print('Lab 2 validation PASSED')
+          "
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Upload Lab 2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab2-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 4: Lab 3 — TLS Migration
+  # ===========================================================================
+  lab3-tls-migration:
+    name: "🔒 Lab 3: PQC TLS Configuration"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab3' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libssl-dev openssl
+          pip install -r requirements.txt
+
+      - name: Build OQS-OpenSSL provider
+        run: |
+          # Build liboqs
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs && mkdir build && cd build
+          cmake -GNinja -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$HOME/liboqs-install ..
+          ninja && ninja install
+          echo "$HOME/liboqs-install/lib" | sudo tee /etc/ld.so.conf.d/liboqs.conf
+          sudo ldconfig
+          echo "LD_LIBRARY_PATH=$HOME/liboqs-install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+          # Build OQS provider
+          cd /tmp
+          git clone --depth 1 https://github.com/open-quantum-safe/oqs-provider.git
+          cd oqs-provider && mkdir build && cd build
+          cmake -GNinja \
+            -Dliboqs_DIR=$HOME/liboqs-install/lib/cmake/liboqs \
+            -DCMAKE_INSTALL_PREFIX=$HOME/oqs-provider-install \
+            ..
+          ninja
+          ninja install || true
+
+          # Find the provider module
+          find $HOME/oqs-provider-install -name "oqsprovider.*" -type f 2>/dev/null || echo "Provider built in build dir"
+          find /tmp/oqs-provider/build -name "oqsprovider.*" -type f 2>/dev/null || true
+
+      - name: Run Lab 3 — TLS Migration
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          
+          # Run the Python-based TLS lab (handles provider availability gracefully)
+          python -m labs.lab3_tls_migration 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab3_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Upload Lab 3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab3-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 5: Lab 4 — Crypto Inventory
+  # ===========================================================================
+  lab4-crypto-inventory:
+    name: "📊 Lab 4: Cryptographic Inventory"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab4' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 4 — Crypto Inventory
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab4_crypto_inventory 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab4_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate inventory completeness
+        run: |
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab4_crypto_inventory.json') as f:
+              data = json.load(f)
+          
+          assets = data['assets']
+          assert len(assets) >= 10, f'Need >=10 assets, got {len(assets)}'
+          
+          # Verify each asset has required fields
+          required_fields = [
+              'asset_id', 'system_name', 'algorithm', 'data_type',
+              'quantum_vulnerable_components', 'migration_target',
+              'priority_score', 'owner', 'test_gate', 'rollback_plan'
+          ]
+          
+          for asset in assets:
+              for field in required_fields:
+                  assert field in asset, f'Asset {asset.get(\"asset_id\", \"?\")} missing {field}'
+          
+          # Verify PCI-DSS coverage
+          all_reqs = set()
+          for asset in assets:
+              for req in asset.get('pci_dss_requirements', []):
+                  all_reqs.add(req)
+          
+          print(f'✓ {len(assets)} assets inventoried')
+          print(f'✓ PCI-DSS requirements covered: {sorted(all_reqs)}')
+          print(f'✓ Quantum-vulnerable: {data[\"quantum_vulnerable_assets\"]}')
+          print(f'✓ Quantum-safe: {data[\"quantum_safe_assets\"]}')
+          print('Lab 4 validation PASSED')
+          "
+
+      - name: Upload Lab 4 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab4-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 6: Lab 5 — BB84 Simulation
+  # ===========================================================================
+  lab5-bb84-simulation:
+    name: "⚛️ Lab 5: BB84 QKD Simulation"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab5' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 5 — BB84 Simulation
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab5_bb84_simulation 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab5_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate BB84 results
+        run: |
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab5_bb84_evidence.json') as f:
+              data = json.load(f)
+          
+          experiments = data['experiments']
+          assert len(experiments) >= 4, f'Need >=4 experiments, got {len(experiments)}'
+          
+          # Verify eavesdropper detection works
+          eve_experiments = [e for e in experiments if e['eve_present']]
+          no_eve_experiments = [e for e in experiments if not e['eve_present']]
+          
+          # With Eve, QBER should be elevated
+          for exp in eve_experiments:
+              assert exp['qber'] > 0.05, f'Eve present but QBER too low: {exp[\"qber\"]}'
+          
+          # Without Eve (and no channel noise), QBER should be near zero
+          clean_no_eve = [e for e in no_eve_experiments if e['channel_error_rate'] == 0]
+          for exp in clean_no_eve:
+              assert exp['qber'] < 0.05, f'No Eve, clean channel, but high QBER: {exp[\"qber\"]}'
+          
+          print(f'✓ {len(experiments)} experiments completed')
+          print(f'✓ Eavesdropper detection validated')
+          print(f'✓ QKD analysis included')
+          print('Lab 5 validation PASSED')
+          "
+
+      - name: Upload Lab 5 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab5-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 7: Lab 6 — Migration Roadmap
+  # ===========================================================================
+  lab6-migration-roadmap:
+    name: "🗺️ Lab 6: 90-Day Migration Roadmap"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab6' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 6 — Migration Roadmap
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab6_migration_roadmap 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab6_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate roadmap
+        run: |
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab6_migration_roadmap.json') as f:
+              data = json.load(f)
+          
+          phases = data['phases']
+          assert len(phases) == 3, f'Expected 3 phases, got {len(phases)}'
+          
+          total_milestones = sum(len(p['milestones']) for p in phases)
+          assert total_milestones >= 12, f'Expected >=12 milestones, got {total_milestones}'
+          
+          # Verify every milestone has required fields
+          for phase in phases:
+              for m in phase['milestones']:
+                  assert 'owner' in m, f'{m[\"milestone_id\"]} missing owner'
+                  assert 'acceptance_criteria' in m, f'{m[\"milestone_id\"]} missing criteria'
+                  assert len(m['acceptance_criteria']) >= 2, f'{m[\"milestone_id\"]} needs more criteria'
+          
+          print(f'✓ {len(phases)} phases defined')
+          print(f'✓ {total_milestones} milestones with owners and acceptance criteria')
+          print('Lab 6 validation PASSED')
+          "
+
+      - name: Upload Lab 6 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab6-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 8: Aggregate Evidence and Generate Report
+  # ===========================================================================
+  aggregate-report:
+    name: "📄 Aggregate Evidence & Generate Report"
+    needs:
+      - lab1-standards-mapping
+      - lab2-algorithm-testing
+      - lab3-tls-migration
+      - lab4-crypto-inventory
+      - lab5-bb84-simulation
+      - lab6-migration-roadmap
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download all evidence artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-evidence/
+
+      - name: Aggregate evidence
+        run: |
+          mkdir -p ${{ env.REPORTS_DIR }}
+          mkdir -p aggregated-evidence
+
+          # Collect all evidence files into one directory
+          find all-evidence/ -name "*.json" -exec cp {} aggregated-evidence/ \;
+          find all-evidence/ -name "*.csv" -exec cp {} aggregated-evidence/ \;
+          find all-evidence/ -name "*.log" -exec cp {} aggregated-evidence/ \;
+          find all-evidence/ -name "*.txt" -exec cp {} aggregated-evidence/ \;
+
+          echo "--- Collected Evidence Files ---"
+          ls -la aggregated-evidence/
+
+      - name: Generate consolidated report
+        run: python scripts/generate_report.py
+        env:
+          EVIDENCE_DIR: aggregated-evidence
+          REPORTS_DIR: ${{ env.REPORTS_DIR }}
+
+      - name: Generate dashboard
+        run: python scripts/publish_dashboard.py
+        env:
+          EVIDENCE_DIR: aggregated-evidence
+          REPORTS_DIR: ${{ env.REPORTS_DIR }}
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pqc-pcidss-migration-pack
+          path: |
+            ${{ env.REPORTS_DIR }}/
+            aggregated-evidence/
+          retention-days: 365
+
+      - name: Upload dashboard for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.REPORTS_DIR }}/dashboard/
+
+  # ===========================================================================
+  # JOB 9: Publish to GitHub Pages
+  # ===========================================================================
+  deploy-dashboard:
+    name: "🌐 Publish Dashboard"
+    needs: aggregate-report
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

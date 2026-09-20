@@ -1,0 +1,34 @@
+name: "PR Validation"
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    name: "🔍 Lint & Test"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8 black mypy
+
+      - name: Lint
+        run: |
+          flake8 labs/ scripts/ tests/ --max-line-length 120 --ignore E501,W503
+          black --check labs/ scripts/ tests/ || echo "::warning::Black formatting differences found"
+
+      - name: Type check
+        run: mypy labs/ --ignore-missing-imports || true
+
+      - name: Run unit tests (no PQC library needed)
+        run: |
+          python -m pytest tests/test_lab1.py tests/test_lab4.py tests/test_lab5.py tests/test_lab6.py -v
