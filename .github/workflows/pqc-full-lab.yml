@@ -129,7 +129,17 @@ jobs:
           print(f'Sample Sigs: {sigs[:5]}')
           " | tee /tmp/pqc-verify.log
 
-          echo "liboqs=$(python -c 'import oqs; print(oqs.oqs_version())')" >> $GITHUB_OUTPUT
+            liboqs_version=$(python -c '
+            import contextlib
+            import io
+            import oqs
+
+            with contextlib.redirect_stdout(io.StringIO()):
+              version = oqs.oqs_version()
+
+            print(version or "unknown")
+            ' | tail -n 1)
+            printf "liboqs=%s\n" "$liboqs_version" >> "$GITHUB_OUTPUT"
 
       - name: Upload environment artifact
         uses: actions/upload-artifact@v4
