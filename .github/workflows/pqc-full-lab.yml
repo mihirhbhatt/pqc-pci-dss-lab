@@ -4,7 +4,7 @@
 # =============================================================================
 name: "PQC-PCI-DSS Full Lab Pipeline"
 
-on:
+'on':
   push:
     branches: [main, develop]
   pull_request:
