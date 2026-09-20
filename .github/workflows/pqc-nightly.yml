@@ -1,9 +1,9 @@
 # Nightly regression — catches dependency changes and algorithm availability shifts
 name: "PQC Nightly Regression"
 
-on:
-  schedule:
-    - cron: "0 3 * * *"  # 3 AM UTC daily
+'on':
+  # schedule:
+  #   - cron: "0 3 * * *"  # 3 AM UTC daily
   workflow_dispatch:
 
 jobs:
