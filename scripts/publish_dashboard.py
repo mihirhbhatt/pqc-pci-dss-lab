@@ -5,6 +5,7 @@ Generates an HTML dashboard from lab evidence for GitHub Pages.
 
 import json
 import os
+from html import escape
 from datetime import datetime
 from pathlib import Path
 
@@ -137,6 +138,51 @@ def generate_dashboard():
                 <td>{exp.get('final_key_length_bits', 0)} bits</td>
             </tr>"""
 
+    # Build QKD attack-detection evidence table
+    qkd_rows = ""
+    if lab6:
+        for trial in lab6.get("trials", []):
+            classification = trial.get("classification", "UNKNOWN")
+            response = trial.get("response", "Not specified")
+            qkd_rows += f"""
+            <tr>
+                <td>{escape(trial.get('scenario', ''))}</td>
+                <td><strong>{escape(classification)}</strong></td>
+                <td>{trial.get('qber', 0) * 100:.2f}%</td>
+                <td>{trial.get('sample_size', 0)}</td>
+                <td>{escape(trial.get('reason', ''))}</td>
+                <td>{escape(response)}</td>
+            </tr>"""
+
+    # Build migration roadmap evidence table
+    roadmap_rows = ""
+    if lab7:
+        for phase in lab7.get("phases", []):
+            phase_label = (
+                f"Phase {phase.get('phase', '')}: {phase.get('name', '')} "
+                f"(Days {phase.get('start_day', '')}-{phase.get('end_day', '')})"
+            )
+            for milestone in phase.get("milestones", []):
+                deliverables = "<br>".join(
+                    f"- {escape(item)}" for item in milestone.get("deliverables", [])
+                )
+                acceptance = "<br>".join(
+                    f"- {escape(item)}" for item in milestone.get("acceptance_criteria", [])
+                )
+                rollback = "<br>".join(
+                    f"- {escape(item)}" for item in milestone.get("rollback_trigger", [])
+                ) or "None specified"
+                roadmap_rows += f"""
+                <tr>
+                    <td>{escape(phase_label)}</td>
+                    <td><strong>{escape(milestone.get('milestone_id', ''))}: {escape(milestone.get('name', ''))}</strong><br>
+                        Due: {escape(milestone.get('due_date', ''))}<br>
+                        Owner: {escape(milestone.get('owner', ''))}</td>
+                    <td>{escape(milestone.get('description', ''))}<br><br>{deliverables}</td>
+                    <td>{acceptance}</td>
+                    <td>{rollback}</td>
+                </tr>"""
+
     # Build inventory table
     inv_rows = ""
     if lab4:
@@ -244,6 +290,33 @@ def generate_dashboard():
                 <th>Key Length</th>
             </tr>
             {bb84_rows if bb84_rows else '<tr><td colspan="6">Lab 5 data not available</td></tr>'}
+        </table>
+
+        <h2>🛡️ QKD Attack Detection Details (Lab 6)</h2>
+        <p class="subtitle">Each observation maps to a protocol action. QBER is a signal; the response should also consider channel health and key availability.</p>
+        <table>
+            <tr>
+                <th>Scenario</th>
+                <th>Classification</th>
+                <th>QBER</th>
+                <th>Sample Bits</th>
+                <th>Why</th>
+                <th>Required Response</th>
+            </tr>
+            {qkd_rows if qkd_rows else '<tr><td colspan="6">Lab 6 data not available</td></tr>'}
+        </table>
+
+        <h2>🗺️ Migration Roadmap Details (Lab 7)</h2>
+        <p class="subtitle">Use the owner, deliverables, acceptance criteria, and rollback triggers to turn each milestone into the next execution step.</p>
+        <table>
+            <tr>
+                <th>Phase</th>
+                <th>Milestone / Owner</th>
+                <th>Action and Deliverables</th>
+                <th>Acceptance Criteria</th>
+                <th>Rollback Triggers</th>
+            </tr>
+            {roadmap_rows if roadmap_rows else '<tr><td colspan="5">Lab 7 data not available</td></tr>'}
         </table>
 
         <div class="footer">
