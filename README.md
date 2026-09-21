@@ -77,7 +77,7 @@ PCI-DSS compliance — are not separate projects. They are the same project.**
 
 ## What Does This POC Do?
 
-The POC consists of **six integrated labs** that walk through the complete
+The POC consists of **seven integrated labs** that walk through the complete
 PQC migration lifecycle:
 
 ### Lab 1: NIST PQC ↔ PCI-DSS Standards Mapping
@@ -174,6 +174,19 @@ crypto-agility framework recommendations.
 Lab 6 also exports a structured migration policy template and a dedicated
 PQC sign-off checklist, including the external scanner confirmation gate.
 
+### Lab 7: QKD Attack Detection and Response
+**What it does:** Classifies QKD observations using QBER, sample availability,
+and a measured channel baseline. It exercises intercept-resend, channel-noise,
+and denial-of-service scenarios and maps each result to a protocol response.
+
+**Why it matters:** Elevated QBER is a useful signal, but it is not proof of
+attacker identity. A deployable QKD control must also handle noisy channels,
+missing key material, authenticated classical messages, and physical device
+protections.
+
+**Output:** Detection policy and JSON evidence covering attack indicators,
+channel anomalies, insufficient data, and required abort or recheck actions.
+
 ---
 
 
@@ -189,6 +202,7 @@ PQC sign-off checklist, including the external scanner confirmation gate.
 | Lab 4 | Migration guidance | 12.3.3, 12.3.4 | Asset inventory + priority scores |
 | Lab 5 | QKD evaluation | Supplementary | BB84 simulation + QKD analysis |
 | Lab 6 | Migration guidance | 3.7.1, 12.3.3, 12.3.4 | 90-day roadmap + checklist |
+| Lab 7 | QKD attack detection | Supplementary | Detection policy + response evidence |
 
 ---
 
@@ -283,6 +297,7 @@ Each lab answers a different question:
 | Can the algorithms fit into TLS? | Lab 3 | Certificate, TLS 1.3, and size-impact evidence |
 | Where are the vulnerable systems? | Lab 4 | Asset inventory with owners, risk, priority, test gate, and rollback |
 | Is QKD relevant to this environment? | Lab 5 | BB84 experiment results and a QKD-vs-PQC assessment |
+| How should QKD anomalies be handled? | Lab 7 | Attack detection and response evidence |
 | What happens next? | Lab 6 | Phased roadmap with owners and acceptance criteria |
 
 The labs are intentionally connected through a common evidence directory. Each

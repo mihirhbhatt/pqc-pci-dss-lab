@@ -496,9 +496,29 @@ jobs:
           eve_experiments = [e for e in experiments if e['eve_present']]
           no_eve_experiments = [e for e in experiments if not e['eve_present']]
           
-          # With Eve, QBER should be elevated
-          for exp in eve_experiments:
+            # Random-basis interception introduces errors; privileged correct-basis
+            # resend is intentionally a low-QBER control, and intercept-only is
+            # detected because no key can be formed.
+            qber_attacks = [
+              e for e in eve_experiments
+              if e.get('attacker_variant') in ('intercept_resend', 'partial_intercept')
+            ]
+            for exp in qber_attacks:
               assert exp['qber'] > 0.05, f'Eve present but QBER too low: {exp[\"qber\"]}'
+
+            correct_basis = [
+              e for e in eve_experiments
+              if e.get('attacker_variant') == 'correct_basis_resend'
+            ]
+            for exp in correct_basis:
+              assert exp['qber'] < 0.05, f'Correct-basis resend QBER too high: {exp[\"qber\"]}'
+
+            intercept_only = [
+              e for e in eve_experiments
+              if e.get('attacker_variant') == 'intercept_only'
+            ]
+            for exp in intercept_only:
+              assert exp['final_key_length_bits'] == 0, 'Intercept-only attack formed a key'
           
           # Without Eve (and no channel noise), QBER should be near zero
           clean_no_eve = [e for e in no_eve_experiments if e['channel_error_rate'] == 0]

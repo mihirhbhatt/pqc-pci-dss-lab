@@ -42,6 +42,7 @@ def main():
         "lab4": {"file": "lab4_crypto_inventory.json", "name": "Crypto Inventory"},
         "lab5": {"file": "lab5_bb84_evidence.json", "name": "BB84 Simulation"},
         "lab6": {"file": "lab6_migration_roadmap.json", "name": "Migration Roadmap"},
+        "lab7": {"file": "lab7_qkd_attack_detection.json", "name": "QKD Attack Detection"},
     }
 
     for lab_id, lab_info in labs.items():
@@ -70,7 +71,7 @@ def main():
 
     # Write markdown summary
     md_path = REPORTS_DIR / "REPORT.md"
-    with open(md_path, "w") as f:
+    with open(md_path, "w", encoding="utf-8") as f:
         f.write(f"# PQC-PCI-DSS Migration Report\n\n")
         f.write(f"**Generated:** {report['generated']}\n\n")
         f.write(f"**Status:** {report['overall_status']}\n\n")
@@ -106,6 +107,10 @@ def extract_summary(lab_id, data):
         phases = data.get("phases", [])
         milestones = sum(len(p.get("milestones", [])) for p in phases)
         return {"phases": len(phases), "milestones": milestones}
+    elif lab_id == "lab7":
+        trials = data.get("trials", [])
+        attacks = [trial for trial in trials if "ATTACK_SUSPECTED" in trial.get("classification", "")]
+        return {"trials": len(trials), "attack_indicators": len(attacks)}
     return {}
 
 

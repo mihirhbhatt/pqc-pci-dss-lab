@@ -31,6 +31,7 @@ def generate_dashboard():
     lab4 = load_json("lab4_crypto_inventory.json")
     lab5 = load_json("lab5_bb84_evidence.json")
     lab6 = load_json("lab6_migration_roadmap.json")
+    lab7 = load_json("lab7_qkd_attack_detection.json")
 
     # Build status cards
     labs_status = []
@@ -93,6 +94,15 @@ def generate_dashboard():
             "name": "Lab 6: Migration Roadmap",
             "status": "complete",
             "metrics": [f"{len(phases)} phases", f"{milestones} milestones"]
+        })
+
+    if lab7:
+        trials = lab7.get("trials", [])
+        attack_indicators = sum("ATTACK_SUSPECTED" in trial.get("classification", "") for trial in trials)
+        labs_status.append({
+            "name": "Lab 7: QKD Attack Detection",
+            "status": "complete",
+            "metrics": [f"{len(trials)} scenarios", f"{attack_indicators} attack indicators"]
         })
 
     # Build algorithm test results table
@@ -247,7 +257,7 @@ def generate_dashboard():
 </html>"""
 
     index_path = DASHBOARD_DIR / "index.html"
-    with open(index_path, "w") as f:
+    with open(index_path, "w", encoding="utf-8") as f:
         f.write(html)
 
     print(f"✓ Dashboard: {index_path}")

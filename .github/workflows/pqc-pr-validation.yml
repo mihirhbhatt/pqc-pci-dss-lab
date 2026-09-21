@@ -31,4 +31,4 @@ jobs:
 
       - name: Run unit tests (no PQC library needed)
         run: |
-          python -m pytest tests/test_lab1.py tests/test_lab4.py tests/test_lab5.py tests/test_lab6.py -v
+          python -m pytest tests/test_lab1.py tests/test_lab4.py tests/test_lab5.py tests/test_lab6.py tests/test_lab7.py -v

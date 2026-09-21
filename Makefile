@@ -1,10 +1,10 @@
-.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 report tls-verify tls-benchmark clean
+.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 lab7 report tls-verify tls-benchmark clean
 
 PYTHON := python3
 EVIDENCE_DIR := evidence
 REPORTS_DIR := reports
 
-all: setup lab1 lab4 lab5 lab6 report
+all: setup lab1 lab4 lab5 lab6 lab7 report
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -35,6 +35,9 @@ lab5:
 
 lab6:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab6_migration_roadmap
+
+lab7:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab7_qkd_attack_detection
 
 report:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) REPORTS_DIR=$(REPORTS_DIR) $(PYTHON) scripts/generate_report.py
