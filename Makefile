@@ -34,10 +34,10 @@ lab5:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab5_bb84_simulation
 
 lab6:
-	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab6_migration_roadmap
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab6_qkd_attack_detection
 
 lab7:
-	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab7_qkd_attack_detection
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab7_migration_roadmap
 
 report:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) REPORTS_DIR=$(REPORTS_DIR) $(PYTHON) scripts/generate_report.py

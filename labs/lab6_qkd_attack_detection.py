@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Lab 7: QKD Attack Detection and Response
+Lab 6: QKD Attack Detection and Response
 
 Uses QBER, sample availability, and a configured channel baseline to classify
 QKD observations. The simulation is educational evidence, not a substitute
@@ -100,7 +100,7 @@ def run_detection_trials(seed=7, sample_size=400, expected_channel_error_rate=0.
 def main():
     results = run_detection_trials()
     evidence = {
-        "lab": "Lab 7: QKD Attack Detection and Response",
+        "lab": "Lab 6: QKD Attack Detection and Response",
         "generated": datetime.now().isoformat(),
         "detection_policy": {
             "qber_abort_threshold": 0.11,
@@ -121,11 +121,11 @@ def main():
             "device protections."
         )
     }
-    path = EVIDENCE_DIR / "lab7_qkd_attack_detection.json"
+    path = EVIDENCE_DIR / "lab6_qkd_attack_detection.json"
     with open(path, "w") as evidence_file:
         json.dump(evidence, evidence_file, indent=2)
 
-    print("LAB 7: QKD ATTACK DETECTION")
+    print("LAB 6: QKD ATTACK DETECTION")
     for result in results:
         print(f"{result['scenario']}: {result['classification']} -> {result['response']}")
     print(f"Evidence exported to: {path}")

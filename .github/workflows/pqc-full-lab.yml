@@ -1,6 +1,6 @@
 # =============================================================================
 # PQC + PCI-DSS Compliance Lab — Full Pipeline
-# Runs all 6 labs, collects evidence, publishes artifacts and dashboard
+# Runs all 7 labs, collects evidence, publishes artifacts and dashboard
 # =============================================================================
 name: "PQC-PCI-DSS Full Lab Pipeline"
 
@@ -12,7 +12,7 @@ name: "PQC-PCI-DSS Full Lab Pipeline"
   workflow_dispatch:
     inputs:
       lab_selection:
-        description: "Which labs to run (all, lab1, lab2, lab3, lab4, lab5, lab6)"
+        description: "Which labs to run (all, lab1, lab2, lab3, lab4, lab5, lab6, lab7)"
         required: false
         default: "all"
       parameter_set:
@@ -484,52 +484,66 @@ jobs:
 
       - name: Validate BB84 results
         run: |
-          python -c "
+          python - <<'PY'
           import json
-          with open('${{ env.EVIDENCE_DIR }}/lab5_bb84_evidence.json') as f:
-              data = json.load(f)
-          
+          import os
+          from pathlib import Path
+
+          evidence_path = Path(os.environ['EVIDENCE_DIR']) / 'lab5_bb84_evidence.json'
+          with evidence_path.open() as evidence_file:
+            data = json.load(evidence_file)
+
           experiments = data['experiments']
-          assert len(experiments) >= 4, f'Need >=4 experiments, got {len(experiments)}'
-          
-          # Verify eavesdropper detection works
+          assert len(experiments) >= 4, (
+            f'Need >=4 experiments, got {len(experiments)}'
+          )
+
           eve_experiments = [e for e in experiments if e['eve_present']]
           no_eve_experiments = [e for e in experiments if not e['eve_present']]
-          
-            # Random-basis interception introduces errors; privileged correct-basis
-            # resend is intentionally a low-QBER control, and intercept-only is
-            # detected because no key can be formed.
-            qber_attacks = [
-              e for e in eve_experiments
-              if e.get('attacker_variant') in ('intercept_resend', 'partial_intercept')
-            ]
-            for exp in qber_attacks:
-              assert exp['qber'] > 0.05, f'Eve present but QBER too low: {exp[\"qber\"]}'
 
-            correct_basis = [
-              e for e in eve_experiments
-              if e.get('attacker_variant') == 'correct_basis_resend'
-            ]
-            for exp in correct_basis:
-              assert exp['qber'] < 0.05, f'Correct-basis resend QBER too high: {exp[\"qber\"]}'
+          # Random-basis interception introduces errors. Correct-basis resend
+          # is a low-QBER control, and intercept-only forms no key.
+          qber_attacks = [
+            e for e in eve_experiments
+            if e.get('attacker_variant') in ('intercept_resend', 'partial_intercept')
+          ]
+          for exp in qber_attacks:
+            assert exp['qber'] > 0.05, (
+              f'Eve present but QBER too low: {exp["qber"]}'
+            )
 
-            intercept_only = [
-              e for e in eve_experiments
-              if e.get('attacker_variant') == 'intercept_only'
-            ]
-            for exp in intercept_only:
-              assert exp['final_key_length_bits'] == 0, 'Intercept-only attack formed a key'
-          
-          # Without Eve (and no channel noise), QBER should be near zero
-          clean_no_eve = [e for e in no_eve_experiments if e['channel_error_rate'] == 0]
+          correct_basis = [
+            e for e in eve_experiments
+            if e.get('attacker_variant') == 'correct_basis_resend'
+          ]
+          for exp in correct_basis:
+            assert exp['qber'] < 0.05, (
+              f'Correct-basis resend QBER too high: {exp["qber"]}'
+            )
+
+          intercept_only = [
+            e for e in eve_experiments
+            if e.get('attacker_variant') == 'intercept_only'
+          ]
+          for exp in intercept_only:
+            assert exp['final_key_length_bits'] == 0, (
+              'Intercept-only attack formed a key'
+            )
+
+          clean_no_eve = [
+            e for e in no_eve_experiments
+            if e['channel_error_rate'] == 0
+          ]
           for exp in clean_no_eve:
-              assert exp['qber'] < 0.05, f'No Eve, clean channel, but high QBER: {exp[\"qber\"]}'
-          
-          print(f'✓ {len(experiments)} experiments completed')
-          print(f'✓ Eavesdropper detection validated')
-          print(f'✓ QKD analysis included')
+            assert exp['qber'] < 0.05, (
+              f'No Eve, clean channel, but high QBER: {exp["qber"]}'
+            )
+
+          print(f'Lab 5: {len(experiments)} experiments completed')
+          print('Eavesdropper detection validated')
+          print('QKD analysis included')
           print('Lab 5 validation PASSED')
-          "
+          PY
 
       - name: Upload Lab 5 evidence
         uses: actions/upload-artifact@v4
@@ -539,10 +553,10 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
-  # JOB 7: Lab 6 — Migration Roadmap
+  # JOB 7: Lab 6 — QKD Attack Detection
   # ===========================================================================
-  lab6-migration-roadmap:
-    name: "🗺️ Lab 6: 90-Day Migration Roadmap"
+  lab6-qkd-attack-detection:
+    name: "🛡️ Lab 6: QKD Attack Detection"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -562,37 +576,32 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Lab 6 — Migration Roadmap
+      - name: Run Lab 6 — QKD Attack Detection
         run: |
           mkdir -p ${{ env.EVIDENCE_DIR }}
-          python -m labs.lab6_migration_roadmap 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab6_console.log
+          python -m labs.lab6_qkd_attack_detection 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab6_console.log
         env:
           EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
 
-      - name: Validate roadmap
+      - name: Validate QKD attack detection
         run: |
-          python -c "
+          python - <<'PY'
           import json
-          with open('${{ env.EVIDENCE_DIR }}/lab6_migration_roadmap.json') as f:
-              data = json.load(f)
-          
-          phases = data['phases']
-          assert len(phases) == 3, f'Expected 3 phases, got {len(phases)}'
-          
-          total_milestones = sum(len(p['milestones']) for p in phases)
-          assert total_milestones >= 12, f'Expected >=12 milestones, got {total_milestones}'
-          
-          # Verify every milestone has required fields
-          for phase in phases:
-              for m in phase['milestones']:
-                  assert 'owner' in m, f'{m[\"milestone_id\"]} missing owner'
-                  assert 'acceptance_criteria' in m, f'{m[\"milestone_id\"]} missing criteria'
-                  assert len(m['acceptance_criteria']) >= 2, f'{m[\"milestone_id\"]} needs more criteria'
-          
-          print(f'✓ {len(phases)} phases defined')
-          print(f'✓ {total_milestones} milestones with owners and acceptance criteria')
+          import os
+          from pathlib import Path
+
+          evidence_path = Path(os.environ['EVIDENCE_DIR']) / 'lab6_qkd_attack_detection.json'
+          data = json.loads(evidence_path.read_text())
+
+          trials = data['trials']
+          assert len(trials) == 4, f'Expected 4 trials, got {len(trials)}'
+          classifications = {trial['scenario']: trial['classification'] for trial in trials}
+          assert classifications['normal_channel'] == 'NO_ATTACK_INDICATOR'
+          assert classifications['intercept_resend'] == 'EAVESDROPPER_ATTACK_SUSPECTED'
+          assert classifications['channel_noise'] == 'CHANNEL_ANOMALY'
+          assert classifications['denial_of_service'] == 'AVAILABILITY_ATTACK_SUSPECTED'
           print('Lab 6 validation PASSED')
-          "
+          PY
 
       - name: Upload Lab 6 evidence
         uses: actions/upload-artifact@v4
@@ -602,7 +611,64 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
-  # JOB 8: Aggregate Evidence and Generate Report
+  # JOB 8: Lab 7 — Migration Roadmap
+  # ===========================================================================
+  lab7-migration-roadmap:
+    name: "🗺️ Lab 7: 90-Day Migration Roadmap"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab7' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 7 — Migration Roadmap
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab7_migration_roadmap 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab7_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate roadmap
+        run: |
+          python -c "
+          import json
+          with open('${{ env.EVIDENCE_DIR }}/lab7_migration_roadmap.json') as f:
+              data = json.load(f)
+          phases = data['phases']
+          assert len(phases) == 3, f'Expected 3 phases, got {len(phases)}'
+          total_milestones = sum(len(p['milestones']) for p in phases)
+          assert total_milestones >= 12, f'Expected >=12 milestones, got {total_milestones}'
+          for phase in phases:
+              for m in phase['milestones']:
+                  assert 'owner' in m, f'{m[\"milestone_id\"]} missing owner'
+                  assert 'acceptance_criteria' in m, f'{m[\"milestone_id\"]} missing criteria'
+                  assert len(m['acceptance_criteria']) >= 2, f'{m[\"milestone_id\"]} needs more criteria'
+          print(f'✓ {len(phases)} phases defined')
+          print(f'✓ {total_milestones} milestones with owners and acceptance criteria')
+          print('Lab 7 validation PASSED')
+          "
+
+      - name: Upload Lab 7 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab7-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # JOB 9: Aggregate Evidence and Generate Report
   # ===========================================================================
   aggregate-report:
     name: "📄 Aggregate Evidence & Generate Report"
@@ -612,7 +678,8 @@ jobs:
       - lab3-tls-migration
       - lab4-crypto-inventory
       - lab5-bb84-simulation
-      - lab6-migration-roadmap
+      - lab6-qkd-attack-detection
+      - lab7-migration-roadmap
     runs-on: ubuntu-latest
     if: always()
 
@@ -674,7 +741,7 @@ jobs:
           path: ${{ env.REPORTS_DIR }}/dashboard/
 
   # ===========================================================================
-  # JOB 9: Publish to GitHub Pages
+  # JOB 10: Publish to GitHub Pages
   # ===========================================================================
   deploy-dashboard:
     name: "🌐 Publish Dashboard"

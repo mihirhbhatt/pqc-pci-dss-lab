@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Lab 6: 90-Day PQC Migration Roadmap for PCI-DSS Compliance
+Lab 7: 90-Day PQC Migration Roadmap for PCI-DSS Compliance
 
 Integrates all previous lab outputs into an actionable migration plan
 with three phases, milestones, owners, acceptance criteria, and
@@ -491,12 +491,12 @@ def export_roadmap_evidence(roadmap):
     """Export roadmap as auditable evidence files."""
 
     # JSON export
-    json_path = EVIDENCE_DIR / "lab6_migration_roadmap.json"
+    json_path = EVIDENCE_DIR / "lab7_migration_roadmap.json"
     with open(json_path, "w") as f:
         json.dump(roadmap, f, indent=2)
 
     # Checklist export
-    checklist_path = EVIDENCE_DIR / "lab6_milestone_checklist.txt"
+    checklist_path = EVIDENCE_DIR / "lab7_milestone_checklist.txt"
     with open(checklist_path, "w") as f:
         f.write("PQC MIGRATION MILESTONE CHECKLIST\n")
         f.write(f"Generated: {datetime.now().isoformat()}\n")
@@ -516,7 +516,7 @@ def export_roadmap_evidence(roadmap):
                         f.write(f"    [!] {rt}\n")
             f.write("\n")
 
-    signoff_path = EVIDENCE_DIR / "lab6_pqc_signoff_checklist.txt"
+    signoff_path = EVIDENCE_DIR / "lab7_pqc_signoff_checklist.txt"
     with open(signoff_path, "w") as f:
         f.write("PQC MIGRATION SIGN-OFF CHECKLIST\n")
         f.write(f"Generated: {datetime.now().isoformat()}\n")
@@ -536,7 +536,7 @@ def export_roadmap_evidence(roadmap):
 
 def main():
     print("=" * 70)
-    print("LAB 6: 90-DAY PQC MIGRATION ROADMAP")
+    print("LAB 7: 90-DAY PQC MIGRATION ROADMAP")
     print("NIST FIPS 203/204/205 + PCI-DSS v4.0")
     print("=" * 70)
 
@@ -545,7 +545,7 @@ def main():
     export_roadmap_evidence(roadmap)
 
     print("\n" + "=" * 70)
-    print("LAB 6 COMPLETE")
+    print("LAB 7 COMPLETE")
     print("Review milestone owners, acceptance criteria, and rollback triggers.")
     print("Present to security leadership for approval.")
     print("=" * 70)

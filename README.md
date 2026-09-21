@@ -159,22 +159,7 @@ detection results, and a QKD-vs-PQC suitability analysis.
 The experiment set includes random-basis intercept-resend, privileged
 correct-basis resend, intercept-only, and partial-intercept attacker variants.
 
-### Lab 6: 90-Day Migration Roadmap
-**What it does:** Assembles all previous lab outputs into a concrete 90-day
-migration plan with three phases (Discovery, Testing, Pilot), 14 milestones,
-named owners, acceptance criteria, and rollback triggers.
-
-**Why it matters:** A migration plan without specific milestones, owners,
-and test gates is not actionable. This lab produces a defensible roadmap
-that can be presented to security leadership, QSAs, and auditors.
-
-**Output:** Complete 90-day roadmap with milestone checklist and
-crypto-agility framework recommendations.
-
-Lab 6 also exports a structured migration policy template and a dedicated
-PQC sign-off checklist, including the external scanner confirmation gate.
-
-### Lab 7: QKD Attack Detection and Response
+### Lab 6: QKD Attack Detection and Response
 **What it does:** Classifies QKD observations using QBER, sample availability,
 and a measured channel baseline. It exercises intercept-resend, channel-noise,
 and denial-of-service scenarios and maps each result to a protocol response.
@@ -186,6 +171,21 @@ protections.
 
 **Output:** Detection policy and JSON evidence covering attack indicators,
 channel anomalies, insufficient data, and required abort or recheck actions.
+
+### Lab 7: 90-Day Migration Roadmap
+**What it does:** Assembles all previous lab outputs into a concrete 90-day
+migration plan with three phases (Discovery, Testing, Pilot), 14 milestones,
+named owners, acceptance criteria, and rollback triggers.
+
+**Why it matters:** A migration plan without specific milestones, owners,
+and test gates is not actionable. This lab produces a defensible roadmap
+that can be presented to security leadership, QSAs, and auditors.
+
+**Output:** Complete 90-day roadmap with milestone checklist and
+crypto-agility framework recommendations.
+
+Lab 7 also exports a structured migration policy template and a dedicated
+PQC sign-off checklist, including the external scanner confirmation gate.
 
 ---
 
@@ -201,8 +201,8 @@ channel anomalies, insufficient data, and required abort or recheck actions.
 | Lab 3 | FIPS 203 + 204 | 4.2.1 | TLS configuration evidence |
 | Lab 4 | Migration guidance | 12.3.3, 12.3.4 | Asset inventory + priority scores |
 | Lab 5 | QKD evaluation | Supplementary | BB84 simulation + QKD analysis |
-| Lab 6 | Migration guidance | 3.7.1, 12.3.3, 12.3.4 | 90-day roadmap + checklist |
-| Lab 7 | QKD attack detection | Supplementary | Detection policy + response evidence |
+| Lab 6 | QKD attack detection | Supplementary | Detection policy + response evidence |
+| Lab 7 | Migration guidance | 3.7.1, 12.3.3, 12.3.4 | 90-day roadmap + checklist |
 
 ---
 
@@ -246,7 +246,7 @@ Present the alignment matrix (Lab 1) and inventory (Lab 4) to your QSA
 as evidence of PCI-DSS 12.3.3 and 12.3.4 compliance planning.
 
 ### For Security Leadership
-Review the 90-day roadmap (Lab 6) and priority scores (Lab 4) to
+Review the 90-day roadmap (Lab 7) and priority scores (Lab 4) to
 understand resource requirements and timeline for quantum-safe migration.
 
 ### For Students and Researchers
@@ -297,8 +297,8 @@ Each lab answers a different question:
 | Can the algorithms fit into TLS? | Lab 3 | Certificate, TLS 1.3, and size-impact evidence |
 | Where are the vulnerable systems? | Lab 4 | Asset inventory with owners, risk, priority, test gate, and rollback |
 | Is QKD relevant to this environment? | Lab 5 | BB84 experiment results and a QKD-vs-PQC assessment |
-| How should QKD anomalies be handled? | Lab 7 | Attack detection and response evidence |
-| What happens next? | Lab 6 | Phased roadmap with owners and acceptance criteria |
+| How should QKD anomalies be handled? | Lab 6 | Attack detection and response evidence |
+| What happens next? | Lab 7 | Phased roadmap with owners and acceptance criteria |
 
 The labs are intentionally connected through a common evidence directory. Each
 program writes JSON, and selected labs also write CSV or console logs. The
@@ -376,9 +376,9 @@ For most distributed payment estates, software-based PQC is the scalable
 baseline. QKD may be evaluated separately for a small number of high-value
 links.
 
-### Lab 6: Convert evidence into execution
+### Lab 7: Convert evidence into execution
 
-Lab 6 turns the previous results into three phases:
+Lab 7 turns the previous results into three phases:
 
 1. **Discovery and planning:** complete the inventory, select algorithms,
     assess vendors and HSMs, and obtain approval.
@@ -411,6 +411,7 @@ make lab3
 make lab4
 make lab5
 make lab6
+make lab7
 make report
 ```
 
@@ -421,7 +422,8 @@ $env:EVIDENCE_DIR = "evidence"
 python -m labs.lab1_standards_mapping
 python -m labs.lab4_crypto_inventory
 python -m labs.lab5_bb84_simulation
-python -m labs.lab6_migration_roadmap
+python -m labs.lab6_qkd_attack_detection
+python -m labs.lab7_migration_roadmap
 $env:REPORTS_DIR = "reports"
 python scripts/generate_report.py
 python scripts/publish_dashboard.py
@@ -433,7 +435,7 @@ but PQC certificate generation requires that provider to be installed.
 
 ### GitHub Actions execution
 
-The workflow in `.github/workflows/pqc-full-lab.yml` runs the six labs in
+The workflow in `.github/workflows/pqc-full-lab.yml` runs the seven labs in
 separate jobs, validates important evidence fields, uploads lab artifacts, and
 then aggregates the artifacts into a report and dashboard. The Pages job runs
 only for a push to `main`.
@@ -455,8 +457,9 @@ The main evidence files are:
 | `evidence/lab3_tls_evidence.json` | OpenSSL, certificate, and TLS test results |
 | `evidence/lab4_crypto_inventory.json` and `.csv` | Asset inventory and quantum-risk priorities |
 | `evidence/lab5_bb84_evidence.json` | BB84 experiments, QBER, and eavesdropper assessment |
-| `evidence/lab6_migration_roadmap.json` | Phases, milestones, owners, and acceptance criteria |
-| `evidence/lab6_pqc_signoff_checklist.txt` | Dedicated PQC migration sign-off checklist |
+| `evidence/lab6_qkd_attack_detection.json` | QKD attack classifications and protocol responses |
+| `evidence/lab7_migration_roadmap.json` | Phases, milestones, owners, and acceptance criteria |
+| `evidence/lab7_pqc_signoff_checklist.txt` | Dedicated PQC migration sign-off checklist |
 | `evidence/pqc_deployment_patterns.md` | Hybrid, rollout, re-keying, and selective-QKD guidance |
 | `reports/consolidated_report.json` | Machine-readable status across all labs |
 | `reports/REPORT.md` | Human-readable summary |

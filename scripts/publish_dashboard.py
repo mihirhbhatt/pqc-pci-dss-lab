@@ -30,8 +30,8 @@ def generate_dashboard():
     lab3 = load_json("lab3_tls_evidence.json")
     lab4 = load_json("lab4_crypto_inventory.json")
     lab5 = load_json("lab5_bb84_evidence.json")
-    lab6 = load_json("lab6_migration_roadmap.json")
-    lab7 = load_json("lab7_qkd_attack_detection.json")
+    lab6 = load_json("lab6_qkd_attack_detection.json")
+    lab7 = load_json("lab7_migration_roadmap.json")
 
     # Build status cards
     labs_status = []
@@ -88,21 +88,21 @@ def generate_dashboard():
         })
 
     if lab6:
-        phases = lab6.get("phases", [])
-        milestones = sum(len(p.get("milestones", [])) for p in phases)
+        trials = lab6.get("trials", [])
+        attack_indicators = sum("ATTACK_SUSPECTED" in trial.get("classification", "") for trial in trials)
         labs_status.append({
-            "name": "Lab 6: Migration Roadmap",
+            "name": "Lab 6: QKD Attack Detection",
             "status": "complete",
-            "metrics": [f"{len(phases)} phases", f"{milestones} milestones"]
+            "metrics": [f"{len(trials)} scenarios", f"{attack_indicators} attack indicators"]
         })
 
     if lab7:
-        trials = lab7.get("trials", [])
-        attack_indicators = sum("ATTACK_SUSPECTED" in trial.get("classification", "") for trial in trials)
+        phases = lab7.get("phases", [])
+        milestones = sum(len(p.get("milestones", [])) for p in phases)
         labs_status.append({
-            "name": "Lab 7: QKD Attack Detection",
+            "name": "Lab 7: Migration Roadmap",
             "status": "complete",
-            "metrics": [f"{len(trials)} scenarios", f"{attack_indicators} attack indicators"]
+            "metrics": [f"{len(phases)} phases", f"{milestones} milestones"]
         })
 
     # Build algorithm test results table

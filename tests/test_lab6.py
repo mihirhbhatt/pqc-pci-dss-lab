@@ -1,48 +1,33 @@
-"""Unit tests for Lab 6 migration roadmap."""
+"""Unit tests for Lab 6 QKD attack detection."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from labs.lab6_migration_roadmap import build_migration_roadmap
+from labs.lab6_qkd_attack_detection import detect_attack, run_detection_trials
 
 
-def test_roadmap_has_three_phases():
-    roadmap = build_migration_roadmap()
-    assert len(roadmap["phases"]) == 3
+def test_high_qber_triggers_abort_and_alert():
+    result = detect_attack(qber=0.25, sample_size=400, sifted_key_length=800)
+    assert result["classification"] == "EAVESDROPPER_ATTACK_SUSPECTED"
+    assert result["response"] == "ABORT_AND_ALERT"
 
 
-def test_every_milestone_has_owner():
-    roadmap = build_migration_roadmap()
-    for phase in roadmap["phases"]:
-        for m in phase["milestones"]:
-            assert "owner" in m and m["owner"], f"{m['milestone_id']} has no owner"
+def test_channel_noise_is_not_mislabeled_as_eavesdropping():
+    result = detect_attack(qber=0.08, sample_size=400, sifted_key_length=800)
+    assert result["classification"] == "CHANNEL_ANOMALY"
+    assert result["response"] == "HOLD_KEY_AND_RECHECK_CHANNEL"
 
 
-def test_every_milestone_has_acceptance_criteria():
-    roadmap = build_migration_roadmap()
-    for phase in roadmap["phases"]:
-        for m in phase["milestones"]:
-            assert len(m["acceptance_criteria"]) >= 2, \
-                f"{m['milestone_id']} needs more acceptance criteria"
+def test_missing_sifted_key_detects_availability_attack():
+    result = detect_attack(qber=0.0, sample_size=0, sifted_key_length=0)
+    assert result["classification"] == "AVAILABILITY_ATTACK_SUSPECTED"
+    assert result["response"] == "ABORT_AND_ALERT"
 
 
-def test_roadmap_covers_90_days():
-    roadmap = build_migration_roadmap()
-    last_phase = roadmap["phases"][-1]
-    assert last_phase["end_day"] == 90
-
-
-def test_pilot_milestones_have_rollback():
-    roadmap = build_migration_roadmap()
-    phase3 = roadmap["phases"][2]  # Pilot phase
-    rollback_milestones = [m for m in phase3["milestones"] if "rollback_trigger" in m]
-    assert len(rollback_milestones) >= 1, "Pilot phase needs rollback triggers"
-
-
-def test_roadmap_includes_policy_template_and_signoff_gate():
-    roadmap = build_migration_roadmap()
-    policy = roadmap["migration_policy_template"]
-    assert policy["target_hybrid_group"] == "X25519MLKEM768"
-    assert "external_scanner_evidence" in policy
-    checklist_items = {item["item"] for item in roadmap["pqc_signoff_checklist"]}
-    assert any("External scanner" in item for item in checklist_items)
+def test_detection_trials_cover_expected_attack_classes():
+    results = run_detection_trials()
+    classifications = {result["scenario"]: result["classification"] for result in results}
+    assert classifications["normal_channel"] == "NO_ATTACK_INDICATOR"
+    assert classifications["intercept_resend"] == "EAVESDROPPER_ATTACK_SUSPECTED"
+    assert classifications["channel_noise"] == "CHANNEL_ANOMALY"
+    assert classifications["denial_of_service"] == "AVAILABILITY_ATTACK_SUSPECTED"

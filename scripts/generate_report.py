@@ -41,8 +41,8 @@ def main():
         "lab3": {"file": "lab3_tls_evidence.json", "name": "TLS Configuration"},
         "lab4": {"file": "lab4_crypto_inventory.json", "name": "Crypto Inventory"},
         "lab5": {"file": "lab5_bb84_evidence.json", "name": "BB84 Simulation"},
-        "lab6": {"file": "lab6_migration_roadmap.json", "name": "Migration Roadmap"},
-        "lab7": {"file": "lab7_qkd_attack_detection.json", "name": "QKD Attack Detection"},
+        "lab6": {"file": "lab6_qkd_attack_detection.json", "name": "QKD Attack Detection"},
+        "lab7": {"file": "lab7_migration_roadmap.json", "name": "Migration Roadmap"},
     }
 
     for lab_id, lab_info in labs.items():
@@ -104,13 +104,13 @@ def extract_summary(lab_id, data):
     elif lab_id == "lab5":
         return {"experiments": len(data.get("experiments", []))}
     elif lab_id == "lab6":
-        phases = data.get("phases", [])
-        milestones = sum(len(p.get("milestones", [])) for p in phases)
-        return {"phases": len(phases), "milestones": milestones}
-    elif lab_id == "lab7":
         trials = data.get("trials", [])
         attacks = [trial for trial in trials if "ATTACK_SUSPECTED" in trial.get("classification", "")]
         return {"trials": len(trials), "attack_indicators": len(attacks)}
+    elif lab_id == "lab7":
+        phases = data.get("phases", [])
+        milestones = sum(len(p.get("milestones", [])) for p in phases)
+        return {"phases": len(phases), "milestones": milestones}
     return {}
 
 
