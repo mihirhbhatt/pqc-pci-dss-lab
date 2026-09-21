@@ -118,6 +118,17 @@ to expect.
 **Output:** Certificate chain evidence, TLS connection test results, and
 size impact analysis.
 
+Lab 3 also detects OpenSSL ML-KEM and `X25519MLKEM768` support. Live evidence
+is opt-in because it requires a reachable endpoint:
+
+```powershell
+python -m labs.lab3_tls_migration --verify-endpoint pq.cloudflareresearch.com
+python -m labs.lab3_tls_migration --benchmark-endpoint pq.cloudflareresearch.com --samples 100
+```
+
+The evidence records negotiated-group status, successful and failed samples,
+median/p95 handshake latency, and median/p95 ClientHello payload size.
+
 ### Lab 4: Cryptographic Asset Inventory
 **What it does:** Builds a complete inventory of 10 representative
 cryptographic assets in a payment processing environment — TLS gateways,
@@ -145,6 +156,9 @@ for PCI-DSS environments while QKD has limited applicability.
 **Output:** Five BB84 experiments with QBER measurements, eavesdropper
 detection results, and a QKD-vs-PQC suitability analysis.
 
+The experiment set includes random-basis intercept-resend, privileged
+correct-basis resend, intercept-only, and partial-intercept attacker variants.
+
 ### Lab 6: 90-Day Migration Roadmap
 **What it does:** Assembles all previous lab outputs into a concrete 90-day
 migration plan with three phases (Discovery, Testing, Pilot), 14 milestones,
@@ -156,6 +170,9 @@ that can be presented to security leadership, QSAs, and auditors.
 
 **Output:** Complete 90-day roadmap with milestone checklist and
 crypto-agility framework recommendations.
+
+Lab 6 also exports a structured migration policy template and a dedicated
+PQC sign-off checklist, including the external scanner confirmation gate.
 
 ---
 
@@ -424,6 +441,8 @@ The main evidence files are:
 | `evidence/lab4_crypto_inventory.json` and `.csv` | Asset inventory and quantum-risk priorities |
 | `evidence/lab5_bb84_evidence.json` | BB84 experiments, QBER, and eavesdropper assessment |
 | `evidence/lab6_migration_roadmap.json` | Phases, milestones, owners, and acceptance criteria |
+| `evidence/lab6_pqc_signoff_checklist.txt` | Dedicated PQC migration sign-off checklist |
+| `evidence/pqc_deployment_patterns.md` | Hybrid, rollout, re-keying, and selective-QKD guidance |
 | `reports/consolidated_report.json` | Machine-readable status across all labs |
 | `reports/REPORT.md` | Human-readable summary |
 | `reports/dashboard/` | Static dashboard for review or Pages publishing |

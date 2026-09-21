@@ -36,10 +36,12 @@ class BB84Simulator:
     6. If QBER < threshold, they produce a shared key
     """
 
-    def __init__(self, num_qubits=1000, eve_present=False, channel_error_rate=0.0):
+    def __init__(self, num_qubits=1000, eve_present=False, channel_error_rate=0.0,
+                 attacker_variant="intercept_resend"):
         self.num_qubits = num_qubits
         self.eve_present = eve_present
         self.channel_error_rate = channel_error_rate
+        self.attacker_variant = attacker_variant
 
     def run_protocol(self):
         """Execute the full BB84 protocol and return results."""
@@ -63,13 +65,35 @@ class BB84Simulator:
         # Step 2: Transmission (with optional Eve)
         transmitted_bits = alice_bits.copy()
         eve_bases = None
+        transmission_available = True
 
         if self.eve_present:
-            print(f"\n[Step 2] Eve intercepts all qubits (intercept-resend attack)")
-            eve_bases = np.random.randint(0, 2, self.num_qubits)
+            print(f"\n[Step 2] Eve attack: {self.attacker_variant}")
+            if self.attacker_variant == "intercept_only":
+                transmission_available = False
+                print("  Eve intercepts the signal and does not resend it")
+            elif self.attacker_variant == "correct_basis_resend":
+                # Educational idealization: Eve is given Alice's basis.
+                eve_bases = alice_bases.copy()
+                print("  Eve measures and resends using Alice's disclosed basis")
+            elif self.attacker_variant in {"intercept_resend", "partial_intercept"}:
+                eve_bases = np.random.randint(0, 2, self.num_qubits)
+                if self.attacker_variant == "partial_intercept":
+                    intercepted = np.random.random(self.num_qubits) < 0.5
+                    eve_bases[~intercepted] = alice_bases[~intercepted]
+                    print("  Eve intercepts approximately half of the qubits")
+                else:
+                    print("  Eve intercepts all qubits and resends")
+            else:
+                raise ValueError(f"Unknown attacker variant: {self.attacker_variant}")
+
+            if not transmission_available:
+                eve_bases = np.zeros(self.num_qubits, dtype=int)
             eve_bits = np.zeros(self.num_qubits, dtype=int)
 
             for i in range(self.num_qubits):
+                if not transmission_available:
+                    continue
                 if eve_bases[i] == alice_bases[i]:
                     eve_bits[i] = alice_bits[i]  # Correct basis
                 else:
@@ -77,9 +101,10 @@ class BB84Simulator:
 
                 transmitted_bits[i] = eve_bits[i]  # Eve re-sends
 
-            eve_correct = np.sum(eve_bits == alice_bits)
-            print(f"  Eve learned {eve_correct}/{self.num_qubits} bits correctly "
-                  f"({eve_correct / self.num_qubits * 100:.1f}%)")
+            if transmission_available:
+                eve_correct = np.sum(eve_bits == alice_bits)
+                print(f"  Eve learned {eve_correct}/{self.num_qubits} bits correctly "
+                    f"({eve_correct / self.num_qubits * 100:.1f}%)")
         else:
             print(f"\n[Step 2] Direct transmission (no eavesdropper)")
 
@@ -88,7 +113,9 @@ class BB84Simulator:
         bob_bits = np.zeros(self.num_qubits, dtype=int)
 
         for i in range(self.num_qubits):
-            if self.eve_present:
+            if not transmission_available:
+                bob_bits[i] = np.random.randint(0, 2)
+            elif self.eve_present:
                 if bob_bases[i] == eve_bases[i]:
                     bob_bits[i] = transmitted_bits[i]
                 else:
@@ -128,7 +155,9 @@ class BB84Simulator:
 
         QBER_THRESHOLD = 0.11  # Standard BB84 security threshold
 
-        if qber < 0.05:
+        if not transmission_available:
+            assessment = "ABORT - No key formed (intercepted signal not resent)"
+        elif qber < 0.05:
             assessment = "SAFE - QBER below warning threshold"
         elif qber < QBER_THRESHOLD:
             assessment = "WARNING - Elevated QBER"
@@ -142,7 +171,7 @@ class BB84Simulator:
               f"Assessment: {assessment}")
 
         # Step 6: Final key
-        eve_detected = qber > QBER_THRESHOLD
+        eve_detected = qber > QBER_THRESHOLD or not transmission_available
 
         if eve_detected:
             print(f"\n[Step 6] PROTOCOL ABORTED - Eavesdropper detected")
@@ -175,7 +204,9 @@ class BB84Simulator:
             "qber_assessment": assessment,
             "eavesdropper_detected": bool(eve_detected),
             "final_key_length_bits": int(final_key_length),
-            "final_key_preview": final_key
+            "final_key_preview": final_key,
+            "attacker_variant": self.attacker_variant if self.eve_present else "none",
+            "protocol_response": assessment
         }
 
 
@@ -186,7 +217,17 @@ def run_experiments():
         {"num_qubits": 1000, "eve_present": False, "channel_error_rate": 0.0,
          "description": "Ideal channel, no eavesdropper"},
         {"num_qubits": 1000, "eve_present": True, "channel_error_rate": 0.0,
+         "attacker_variant": "intercept_resend",
          "description": "Ideal channel, intercept-resend attacker"},
+        {"num_qubits": 1000, "eve_present": True, "channel_error_rate": 0.0,
+         "attacker_variant": "correct_basis_resend",
+         "description": "Idealized correct-basis resend (privileged attacker)"},
+        {"num_qubits": 1000, "eve_present": True, "channel_error_rate": 0.0,
+         "attacker_variant": "intercept_only",
+         "description": "Intercept-only attacker, no resend"},
+        {"num_qubits": 1000, "eve_present": True, "channel_error_rate": 0.0,
+         "attacker_variant": "partial_intercept",
+         "description": "Custom variant: partial intercept"},
         {"num_qubits": 1000, "eve_present": False, "channel_error_rate": 0.03,
          "description": "Noisy channel (3%), no eavesdropper"},
         {"num_qubits": 1000, "eve_present": True, "channel_error_rate": 0.03,
@@ -205,7 +246,8 @@ def run_experiments():
         sim = BB84Simulator(
             num_qubits=exp["num_qubits"],
             eve_present=exp["eve_present"],
-            channel_error_rate=exp["channel_error_rate"]
+            channel_error_rate=exp["channel_error_rate"],
+            attacker_variant=exp.get("attacker_variant", "intercept_resend")
         )
         result = sim.run_protocol()
         result["experiment_id"] = i + 1

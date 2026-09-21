@@ -32,3 +32,36 @@ def test_bb84_key_produced_without_eve():
     result = sim.run_protocol()
     assert result["final_key_length_bits"] > 0
     assert result["final_key_preview"] != "ABORTED"
+
+
+def test_bb84_correct_basis_resend_has_no_intrinsic_qber():
+    sim = BB84Simulator(
+        num_qubits=2000,
+        eve_present=True,
+        attacker_variant="correct_basis_resend"
+    )
+    result = sim.run_protocol()
+    assert result["attacker_variant"] == "correct_basis_resend"
+    assert result["qber"] < 0.05
+
+
+def test_bb84_intercept_only_forms_no_key():
+    sim = BB84Simulator(
+        num_qubits=2000,
+        eve_present=True,
+        attacker_variant="intercept_only"
+    )
+    result = sim.run_protocol()
+    assert result["final_key_length_bits"] == 0
+    assert result["protocol_response"].startswith("ABORT - No key formed")
+
+
+def test_bb84_partial_intercept_is_recorded():
+    sim = BB84Simulator(
+        num_qubits=2000,
+        eve_present=True,
+        attacker_variant="partial_intercept"
+    )
+    result = sim.run_protocol()
+    assert result["attacker_variant"] == "partial_intercept"
+    assert result["qber"] > 0.05

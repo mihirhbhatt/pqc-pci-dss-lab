@@ -1,4 +1,4 @@
-.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 report clean
+.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 report tls-verify tls-benchmark clean
 
 PYTHON := python3
 EVIDENCE_DIR := evidence
@@ -18,6 +18,14 @@ lab2:
 
 lab3:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab3_tls_migration
+
+tls-verify:
+	@test -n "$(TLS_HOST)" || (echo "Usage: make tls-verify TLS_HOST=example.com" && exit 1)
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab3_tls_migration --verify-endpoint $(TLS_HOST) --port $(or $(TLS_PORT),443)
+
+tls-benchmark:
+	@test -n "$(TLS_HOST)" || (echo "Usage: make tls-benchmark TLS_HOST=example.com [SAMPLES=100]" && exit 1)
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab3_tls_migration --benchmark-endpoint $(TLS_HOST) --port $(or $(TLS_PORT),443) --samples $(or $(SAMPLES),100)
 
 lab4:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab4_crypto_inventory

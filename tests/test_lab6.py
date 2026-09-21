@@ -37,3 +37,12 @@ def test_pilot_milestones_have_rollback():
     phase3 = roadmap["phases"][2]  # Pilot phase
     rollback_milestones = [m for m in phase3["milestones"] if "rollback_trigger" in m]
     assert len(rollback_milestones) >= 1, "Pilot phase needs rollback triggers"
+
+
+def test_roadmap_includes_policy_template_and_signoff_gate():
+    roadmap = build_migration_roadmap()
+    policy = roadmap["migration_policy_template"]
+    assert policy["target_hybrid_group"] == "X25519MLKEM768"
+    assert "external_scanner_evidence" in policy
+    checklist_items = {item["item"] for item in roadmap["pqc_signoff_checklist"]}
+    assert any("External scanner" in item for item in checklist_items)

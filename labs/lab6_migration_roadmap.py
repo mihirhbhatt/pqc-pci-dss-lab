@@ -20,6 +20,41 @@ EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 START_DATE = datetime(2025, 7, 1)
 
 
+def build_migration_policy_template():
+    """Return the sign-off fields from the hybrid TLS migration template."""
+    return {
+        "system_owner_team": "",
+        "data_classification_secrecy_lifetime": "",
+        "current_algorithms": "",
+        "target_hybrid_group": "X25519MLKEM768",
+        "dependencies_hsm_lb_waf_clients": "",
+        "rollback_plan": "Keep the classical group enabled as fallback",
+        "success_metrics": {
+            "handshake_success_rate": "> 99.5%",
+            "latency_delta_ms": "< 5 ms",
+            "client_hello_size_under_mtu": True
+        },
+        "sign_off_date": "",
+        "review_date": "",
+        "external_scanner_evidence": ""
+    }
+
+
+def build_pqc_signoff_checklist():
+    """Return a dedicated checklist aligned with the course reference sheet."""
+    return [
+        {"id": 1, "item": "Crypto inventory built and reviewed", "status": "NOT_STARTED"},
+        {"id": 2, "item": "Data secrecy lifetimes classified", "status": "NOT_STARTED"},
+        {"id": 3, "item": "Hybrid TLS pilot measured for two weeks", "status": "NOT_STARTED"},
+        {"id": 4, "item": "MTU, load balancer, WAF, and client compatibility validated", "status": "NOT_STARTED"},
+        {"id": 5, "item": "HSM and vendor PQC roadmap confirmed in writing", "status": "NOT_STARTED"},
+        {"id": 6, "item": "Policy template completed and signed", "status": "NOT_STARTED"},
+        {"id": 7, "item": "Hybrid key exchange rollout roadmap approved", "status": "NOT_STARTED"},
+        {"id": 8, "item": "Quarterly retest procedure scheduled", "status": "NOT_STARTED"},
+        {"id": 9, "item": "External scanner confirms hybrid group on live endpoint", "status": "NOT_STARTED"}
+    ]
+
+
 def build_migration_roadmap():
     """Build the complete 90-day migration roadmap."""
 
@@ -393,6 +428,8 @@ def build_migration_roadmap():
         ]
     }
 
+    roadmap["migration_policy_template"] = build_migration_policy_template()
+    roadmap["pqc_signoff_checklist"] = build_pqc_signoff_checklist()
     return roadmap
 
 
@@ -479,9 +516,18 @@ def export_roadmap_evidence(roadmap):
                         f.write(f"    [!] {rt}\n")
             f.write("\n")
 
+    signoff_path = EVIDENCE_DIR / "lab6_pqc_signoff_checklist.txt"
+    with open(signoff_path, "w") as f:
+        f.write("PQC MIGRATION SIGN-OFF CHECKLIST\n")
+        f.write(f"Generated: {datetime.now().isoformat()}\n")
+        f.write("=" * 60 + "\n\n")
+        for item in roadmap["pqc_signoff_checklist"]:
+            f.write(f"[ ] {item['id']}. {item['item']}\n")
+
     print(f"\nEvidence exported:")
     print(f"  JSON:      {json_path}")
     print(f"  Checklist: {checklist_path}")
+    print(f"  Sign-off:  {signoff_path}")
 
 
 # =============================================================================
