@@ -1,6 +1,6 @@
 # =============================================================================
 # PQC + PCI-DSS Compliance Lab — Full Pipeline
-# Runs all 7 labs, collects evidence, publishes artifacts and dashboard
+# Runs all 9 labs, collects evidence, publishes artifacts and dashboard
 # =============================================================================
 name: "PQC-PCI-DSS Full Lab Pipeline"
 
@@ -12,7 +12,7 @@ name: "PQC-PCI-DSS Full Lab Pipeline"
   workflow_dispatch:
     inputs:
       lab_selection:
-        description: "Which labs to run (all, lab1, lab2, lab3, lab4, lab5, lab6, lab7)"
+        description: "Which labs to run (all, lab1-lab18, or a single lab)"
         required: false
         default: "all"
       parameter_set:
@@ -668,8 +668,142 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # JOB 9: Aggregate Evidence and Generate Report
   # ===========================================================================
+  # JOB 9: Lab 8 - ML-KEM Envelope Encryption
+  # ===========================================================================
+  lab8-pqc-envelope:
+    name: "🔐 Lab 8: ML-KEM Envelope Encryption"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab8' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 8 - ML-KEM Envelope Encryption
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab8_pqc_envelope_encryption 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab8_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate Lab 8 envelope
+        run: |
+          python -m pytest tests/test_lab8_pqc_envelope_encryption.py -q
+
+      - name: Upload Lab 8 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab8-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # ===========================================================================
+  # JOB 10: Lab 9 - Kubernetes Cryptographic Service Baseline
+  # ===========================================================================
+  lab9-kubernetes-baseline:
+    name: "☸️ Lab 9: Kubernetes Cryptographic Service Baseline"
+    needs: setup
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == 'lab9' ||
+      github.event.inputs.lab_selection == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab 9 - Kubernetes Crypto Baseline
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.lab9_kubernetes_crypto_baseline 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab9_console.log
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate Lab 9 baseline
+        run: python -m pytest tests/test_lab9_kubernetes_crypto_baseline.py -q
+
+      - name: Upload Lab 9 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab9-evidence
+          path: ${{ env.EVIDENCE_DIR }}/
+          retention-days: 90
+
+  # JOB 10: Aggregate Evidence and Generate Report
+  # ===========================================================================
+  enterprise-labs-10-18:
+    name: "🏗️ Lab ${{ matrix.lab }}: Enterprise Orchestration"
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {lab: 10, module: lab10_vault_secret_policy, test: test_labs10_14.py}
+          - {lab: 11, module: lab11_vault_pki_issuance, test: test_labs10_14.py}
+          - {lab: 12, module: lab12_service_mesh_mtls, test: test_labs10_14.py}
+          - {lab: 13, module: lab13_iac_security_validation, test: test_labs10_14.py}
+          - {lab: 14, module: lab14_network_policy_analysis, test: test_labs10_14.py}
+          - {lab: 15, module: lab15_key_rotation, test: test_labs15_18.py}
+          - {lab: 16, module: lab16_configuration_drift, test: test_labs15_18.py}
+          - {lab: 17, module: lab17_zero_trust_policy, test: test_labs15_18.py}
+          - {lab: 18, module: lab18_multi_region_failover, test: test_labs15_18.py}
+    if: >
+      github.event.inputs.lab_selection == 'all' ||
+      github.event.inputs.lab_selection == '' ||
+      github.event.inputs.lab_selection == format('lab{0}', matrix.lab)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Lab ${{ matrix.lab }}
+        run: |
+          mkdir -p ${{ env.EVIDENCE_DIR }}
+          python -m labs.${{ matrix.module }}
+        env:
+          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+
+      - name: Validate enterprise lab policies
+        run: python -m pytest tests/${{ matrix.test }} -q
+
+      - name: Upload Lab ${{ matrix.lab }} evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab${{ matrix.lab }}-evidence
+          path: ${{ env.EVIDENCE_DIR }}/lab${{ matrix.lab }}_*.json
+          retention-days: 90
+
   aggregate-report:
     name: "📄 Aggregate Evidence & Generate Report"
     needs:
@@ -680,6 +814,9 @@ jobs:
       - lab5-bb84-simulation
       - lab6-qkd-attack-detection
       - lab7-migration-roadmap
+      - lab8-pqc-envelope
+      - lab9-kubernetes-baseline
+      - enterprise-labs-10-18
     runs-on: ubuntu-latest
     if: always()
 

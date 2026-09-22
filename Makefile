@@ -1,10 +1,10 @@
-.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 lab7 report tls-verify tls-benchmark clean
+.PHONY: all setup test lab1 lab2 lab3 lab4 lab5 lab6 lab7 lab8 lab9 lab10 lab11 lab12 lab13 lab14 lab15 lab16 lab17 lab18 report tls-verify tls-benchmark clean
 
 PYTHON := python3
 EVIDENCE_DIR := evidence
 REPORTS_DIR := reports
 
-all: setup lab1 lab4 lab5 lab6 lab7 report
+all: setup lab1 lab2 lab3 lab4 lab5 lab6 lab7 lab8 lab9 lab10 lab11 lab12 lab13 lab14 lab15 lab16 lab17 lab18 report
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -38,6 +38,39 @@ lab6:
 
 lab7:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab7_migration_roadmap
+
+lab8:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab8_pqc_envelope_encryption
+
+lab9:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab9_kubernetes_crypto_baseline
+
+lab10:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab10_vault_secret_policy
+
+lab11:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab11_vault_pki_issuance
+
+lab12:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab12_service_mesh_mtls
+
+lab13:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab13_iac_security_validation
+
+lab14:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab14_network_policy_analysis
+
+lab15:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab15_key_rotation
+
+lab16:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab16_configuration_drift
+
+lab17:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab17_zero_trust_policy
+
+lab18:
+	EVIDENCE_DIR=$(EVIDENCE_DIR) $(PYTHON) -m labs.lab18_multi_region_failover
 
 report:
 	EVIDENCE_DIR=$(EVIDENCE_DIR) REPORTS_DIR=$(REPORTS_DIR) $(PYTHON) scripts/generate_report.py

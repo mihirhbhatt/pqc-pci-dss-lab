@@ -187,6 +187,20 @@ crypto-agility framework recommendations.
 Lab 7 also exports a structured migration policy template and a dedicated
 PQC sign-off checklist, including the external scanner confirmation gate.
 
+### Lab 8: ML-KEM Envelope Encryption
+**What it does:** Protects a random AES-256-GCM data-encryption key with an
+ML-KEM-derived wrapping key using HKDF-SHA256, then stores the payload and
+authenticated metadata in a versioned envelope.
+
+**Why it matters:** This turns the Lab 4 card-vault migration target into a
+testable key-management workflow. It demonstrates tamper detection, wrong-key
+rejection, and re-encryption under a rotated KEM key identifier without
+pretending that ML-KEM directly encrypts PAN data.
+
+**Output:** `evidence/lab8_pqc_envelope_evidence.json`. The envelope tests run
+without liboqs; the real ML-KEM-768 demonstration runs when `liboqs-python` is
+installed.
+
 ---
 
 
@@ -203,6 +217,40 @@ PQC sign-off checklist, including the external scanner confirmation gate.
 | Lab 5 | QKD evaluation | Supplementary | BB84 simulation + QKD analysis |
 | Lab 6 | QKD attack detection | Supplementary | Detection policy + response evidence |
 | Lab 7 | Migration guidance | 3.7.1, 12.3.3, 12.3.4 | 90-day roadmap + checklist |
+| Lab 8 | FIPS 203 + AES-256-GCM | 3.5, 3.6, 3.7 | Envelope, rotation, and tamper evidence |
+| Lab 9 | Kubernetes security policy | 2.2.7, 4.2.1, 6.4 | Crypto service baseline evidence |
+
+### Scaled Enterprise Labs: 9-18
+
+The attached enterprise-orchestration material can be implemented as offline,
+evidence-producing labs before adding optional Kubernetes, Vault, Terraform,
+or service-mesh integration tests:
+
+| Planned lab | Source topic | Local implementation focus |
+|---|---|---|
+| Lab 9 | Kubernetes cryptographic services | Manifest security baseline and hybrid TLS policy |
+| Lab 10 | Vault secrets at scale | Secret path policy, lease limits, and access review |
+| Lab 11 | Vault PKI certificate issuance | Certificate profile and renewal policy validation |
+| Lab 12 | PQC service mesh mTLS | Peer-authentication and trust-domain policy model |
+| Lab 13 | Infrastructure as Code | Terraform-like security controls and plan validation |
+| Lab 14 | Network policies | Least-privilege ingress and egress graph checks |
+| Lab 15 | Automated key rotation | Rotation state machine, overlap window, and rollback |
+| Lab 16 | Configuration drift | Baseline hashing and drift classification |
+| Lab 17 | Zero-trust architecture | Identity, authorization, and default-deny decision tests |
+| Lab 18 | Multi-region failover | Quorum, replication lag, and recovery decision model |
+
+Labs 10-18 should remain deterministic by default and treat live infrastructure
+as an optional integration layer. This keeps CI usable without cluster or Vault
+credentials while still producing auditable migration evidence.
+
+The execution order is now sequential:
+
+`Lab 1` standards mapping -> `Lab 2` algorithm testing -> `Lab 3` TLS ->
+`Lab 4` inventory -> `Lab 5` BB84 -> `Lab 6` QKD response -> `Lab 7` roadmap ->
+`Lab 8` envelope encryption -> `Lab 9` Kubernetes baseline -> `Lab 10` Vault
+secrets -> `Lab 11` Vault PKI -> `Lab 12` service-mesh mTLS -> `Lab 13` IaC ->
+`Lab 14` network policy -> `Lab 15` key rotation -> `Lab 16` drift detection ->
+`Lab 17` zero trust -> `Lab 18` multi-region failover.
 
 ---
 
