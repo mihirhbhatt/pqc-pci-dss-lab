@@ -1,7 +1,3 @@
-# =============================================================================
-# PQC + PCI-DSS Compliance Lab — Full Pipeline
-# Runs all 9 labs, collects evidence, publishes artifacts and dashboard
-# =============================================================================
 name: "PQC-PCI-DSS Full Lab Pipeline"
 
 'on':
@@ -12,7 +8,7 @@ name: "PQC-PCI-DSS Full Lab Pipeline"
   workflow_dispatch:
     inputs:
       lab_selection:
-        description: "Which labs to run (all, lab1-lab18, or a single lab)"
+        description: "Which labs to run (all, lab1-lab7, or a single lab)"
         required: false
         default: "all"
       parameter_set:
@@ -20,7 +16,7 @@ name: "PQC-PCI-DSS Full Lab Pipeline"
         required: false
         default: "all"
 
-# Cancel in-progress runs for the same branch
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -37,11 +33,8 @@ permissions:
   actions: read
 
 jobs:
-  # ===========================================================================
-  # JOB 1: Build Environment and Install Dependencies
-  # ===========================================================================
   setup:
-    name: "🔧 Setup PQC Environment"
+    name: "Setup PQC Environment"
     runs-on: ubuntu-latest
     outputs:
       cache-key: ${{ steps.cache-deps.outputs.cache-hit }}
@@ -148,11 +141,9 @@ jobs:
           path: /tmp/pqc-verify.log
           retention-days: 30
 
-  # ===========================================================================
-  # JOB 2: Lab 1 — Standards Mapping
-  # ===========================================================================
+
   lab1-standards-mapping:
-    name: "📋 Lab 1: NIST PQC ↔ PCI-DSS Mapping"
+    name: " Lab 1: NIST PQC ↔ PCI-DSS Mapping"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -223,11 +214,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 3: Lab 2 — Algorithm Testing
-  # ===========================================================================
+
   lab2-algorithm-testing:
-    name: "🔬 Lab 2: ML-KEM + ML-DSA Testing"
+    name: " Lab 2: ML-KEM + ML-DSA Testing"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -309,11 +298,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 4: Lab 3 — TLS Migration
-  # ===========================================================================
+
   lab3-tls-migration:
-    name: "🔒 Lab 3: PQC TLS Configuration"
+    name: " Lab 3: PQC TLS Configuration"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -379,11 +366,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 5: Lab 4 — Crypto Inventory
-  # ===========================================================================
+
   lab4-crypto-inventory:
-    name: "📊 Lab 4: Cryptographic Inventory"
+    name: " Lab 4: Cryptographic Inventory"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -451,11 +436,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 6: Lab 5 — BB84 Simulation
-  # ===========================================================================
+
   lab5-bb84-simulation:
-    name: "⚛️ Lab 5: BB84 QKD Simulation"
+    name: "Lab 5: BB84 QKD Simulation"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -552,11 +535,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 7: Lab 6 — QKD Attack Detection
-  # ===========================================================================
+
   lab6-qkd-attack-detection:
-    name: "🛡️ Lab 6: QKD Attack Detection"
+    name: "Lab 6: QKD Attack Detection"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -610,11 +591,9 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 8: Lab 7 — Migration Roadmap
-  # ===========================================================================
+
   lab7-migration-roadmap:
-    name: "🗺️ Lab 7: 90-Day Migration Roadmap"
+    name: "Lab 7: 90-Day Migration Roadmap"
     needs: setup
     runs-on: ubuntu-latest
     if: >
@@ -668,151 +647,8 @@ jobs:
           path: ${{ env.EVIDENCE_DIR }}/
           retention-days: 90
 
-  # ===========================================================================
-  # JOB 9: Lab 8 - ML-KEM Envelope Encryption
-  # ===========================================================================
-  lab8-pqc-envelope:
-    name: "🔐 Lab 8: ML-KEM Envelope Encryption"
-    needs: setup
-    runs-on: ubuntu-latest
-    if: >
-      github.event.inputs.lab_selection == 'all' ||
-      github.event.inputs.lab_selection == 'lab8' ||
-      github.event.inputs.lab_selection == ''
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run Lab 8 - ML-KEM Envelope Encryption
-        run: |
-          mkdir -p ${{ env.EVIDENCE_DIR }}
-          python -m labs.lab8_pqc_envelope_encryption 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab8_console.log
-        env:
-          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
-
-      - name: Validate Lab 8 envelope
-        run: |
-          python -m pytest tests/test_lab8_pqc_envelope_encryption.py -q
-
-      - name: Upload Lab 8 evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: lab8-evidence
-          path: ${{ env.EVIDENCE_DIR }}/
-          retention-days: 90
-
-  # ===========================================================================
-  # JOB 10: Lab 9 - Kubernetes Cryptographic Service Baseline
-  # ===========================================================================
-  lab9-kubernetes-baseline:
-    name: "☸️ Lab 9: Kubernetes Cryptographic Service Baseline"
-    needs: setup
-    runs-on: ubuntu-latest
-    if: >
-      github.event.inputs.lab_selection == 'all' ||
-      github.event.inputs.lab_selection == 'lab9' ||
-      github.event.inputs.lab_selection == ''
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run Lab 9 - Kubernetes Crypto Baseline
-        run: |
-          mkdir -p ${{ env.EVIDENCE_DIR }}
-          python -m labs.lab9_kubernetes_crypto_baseline 2>&1 | tee ${{ env.EVIDENCE_DIR }}/lab9_console.log
-        env:
-          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
-
-      - name: Validate Lab 9 baseline
-        run: python -m pytest tests/test_lab9_kubernetes_crypto_baseline.py -q
-
-      - name: Upload Lab 9 evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: lab9-evidence
-          path: ${{ env.EVIDENCE_DIR }}/
-          retention-days: 90
-
-  # JOB 10: Aggregate Evidence and Generate Report
-  # ===========================================================================
-  enterprise-labs-10-18:
-    name: "🏗️ Lab ${{ matrix.lab }}: Enterprise Orchestration"
-    needs: setup
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {lab: 10, module: lab10_vault_secret_policy, test: test_labs10_14.py}
-          - {lab: 11, module: lab11_vault_pki_issuance, test: test_labs10_14.py}
-          - {lab: 12, module: lab12_service_mesh_mtls, test: test_labs10_14.py}
-          - {lab: 13, module: lab13_iac_security_validation, test: test_labs10_14.py}
-          - {lab: 14, module: lab14_network_policy_analysis, test: test_labs10_14.py}
-          - {lab: 15, module: lab15_key_rotation, test: test_labs15_18.py}
-          - {lab: 16, module: lab16_configuration_drift, test: test_labs15_18.py}
-          - {lab: 17, module: lab17_zero_trust_policy, test: test_labs15_18.py}
-          - {lab: 18, module: lab18_multi_region_failover, test: test_labs15_18.py}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run Lab ${{ matrix.lab }}
-        if: >
-          github.event.inputs.lab_selection == 'all' ||
-          github.event.inputs.lab_selection == '' ||
-          github.event.inputs.lab_selection == format('lab{0}', matrix.lab)
-        run: |
-          mkdir -p ${{ env.EVIDENCE_DIR }}
-          python -m labs.${{ matrix.module }}
-        env:
-          EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
-
-      - name: Validate enterprise lab policies
-        if: >
-          github.event.inputs.lab_selection == 'all' ||
-          github.event.inputs.lab_selection == '' ||
-          github.event.inputs.lab_selection == format('lab{0}', matrix.lab)
-        run: python -m pytest tests/${{ matrix.test }} -q
-
-      - name: Upload Lab ${{ matrix.lab }} evidence
-        if: >
-          github.event.inputs.lab_selection == 'all' ||
-          github.event.inputs.lab_selection == '' ||
-          github.event.inputs.lab_selection == format('lab{0}', matrix.lab)
-        uses: actions/upload-artifact@v4
-        with:
-          name: lab${{ matrix.lab }}-evidence
-          path: ${{ env.EVIDENCE_DIR }}/lab${{ matrix.lab }}_*.json
-          retention-days: 90
-
   aggregate-report:
-    name: "📄 Aggregate Evidence & Generate Report"
+    name: "Aggregate Evidence & Generate Report"
     needs:
       - lab1-standards-mapping
       - lab2-algorithm-testing
@@ -821,9 +657,6 @@ jobs:
       - lab5-bb84-simulation
       - lab6-qkd-attack-detection
       - lab7-migration-roadmap
-      - lab8-pqc-envelope
-      - lab9-kubernetes-baseline
-      - enterprise-labs-10-18
     runs-on: ubuntu-latest
     if: always()
 
@@ -884,11 +717,9 @@ jobs:
         with:
           path: ${{ env.REPORTS_DIR }}/dashboard/
 
-  # ===========================================================================
-  # JOB 10: Publish to GitHub Pages
-  # ===========================================================================
+
   deploy-dashboard:
-    name: "🌐 Publish Dashboard"
+    name: "Publish Dashboard"
     needs: aggregate-report
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

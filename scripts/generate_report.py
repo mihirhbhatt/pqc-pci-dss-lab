@@ -43,29 +43,24 @@ def main():
         "lab5": {"file": "lab5_bb84_evidence.json", "name": "BB84 Simulation"},
         "lab6": {"file": "lab6_qkd_attack_detection.json", "name": "QKD Attack Detection"},
         "lab7": {"file": "lab7_migration_roadmap.json", "name": "Migration Roadmap"},
-        "lab8": {"file": "lab8_pqc_envelope_evidence.json", "name": "ML-KEM Envelope Encryption"},
-        "lab9": {"file": "lab9_kubernetes_crypto_baseline.json", "name": "Kubernetes Crypto Baseline"},
-        "lab10": {"file": "lab10_vault_secret_policy.json", "name": "Vault Secret Policy"},
-        "lab11": {"file": "lab11_vault_pki_issuance.json", "name": "Vault PKI Issuance"},
-        "lab12": {"file": "lab12_service_mesh_mtls.json", "name": "Service-Mesh mTLS"},
-        "lab13": {"file": "lab13_iac_security_validation.json", "name": "IaC Security Validation"},
-        "lab14": {"file": "lab14_network_policy_analysis.json", "name": "Network-Policy Analysis"},
-        "lab15": {"file": "lab15_key_rotation.json", "name": "Automated Key Rotation"},
-        "lab16": {"file": "lab16_configuration_drift.json", "name": "Configuration Drift"},
-        "lab17": {"file": "lab17_zero_trust_policy.json", "name": "Zero-Trust Policy"},
-        "lab18": {"file": "lab18_multi_region_failover.json", "name": "Multi-Region Failover"},
     }
 
     for lab_id, lab_info in labs.items():
         data = load_evidence(lab_info["file"])
         if data:
+            evidence_status = data.get("status", "COMPLETE")
+            status = "SKIPPED" if evidence_status == "SKIPPED" else (
+                "FAILED" if evidence_status in {"FAIL", "FAILED", "ERROR"} else "COMPLETE"
+            )
             report["lab_results"][lab_id] = {
                 "name": lab_info["name"],
-                "status": "COMPLETE",
+                "status": status,
                 "evidence_file": lab_info["file"],
                 "summary": extract_summary(lab_id, data)
             }
-            print(f"  [PASS] {lab_id}: {lab_info['name']} - COMPLETE")
+            if status != "COMPLETE":
+                report["overall_status"] = "PARTIAL"
+            print(f"  [{status}] {lab_id}: {lab_info['name']} - {status}")
         else:
             report["lab_results"][lab_id] = {
                 "name": lab_info["name"],
@@ -90,7 +85,9 @@ def main():
         f.write("| Lab | Name | Status |\n")
         f.write("|-----|------|--------|\n")
         for lab_id, result in report["lab_results"].items():
-            status_icon = "✅" if result["status"] == "COMPLETE" else "❌"
+            status_icon = "✅" if result["status"] == "COMPLETE" else (
+                "⏭️" if result["status"] == "SKIPPED" else "❌"
+            )
             f.write(f"| {lab_id} | {result['name']} | {status_icon} {result['status']} |\n")
 
     print(f"\nReport: {report_path}")
@@ -122,19 +119,6 @@ def extract_summary(lab_id, data):
         phases = data.get("phases", [])
         milestones = sum(len(p.get("milestones", [])) for p in phases)
         return {"phases": len(phases), "milestones": milestones}
-    elif lab_id == "lab8":
-        return {
-            "kem": data.get("result", {}).get("kem", "ML-KEM-768"),
-            "status": data.get("status", "UNKNOWN"),
-        }
-    elif lab_id == "lab9":
-        return {
-            "service": data.get("service", "unknown"),
-            "checks_run": data.get("policy_checks", {}).get("checks_run", 0),
-            "violations": len(data.get("policy_checks", {}).get("violations", [])),
-        }
-    elif lab_id in {"lab10", "lab11", "lab12", "lab13", "lab14", "lab15", "lab16", "lab17", "lab18"}:
-        return {"status": data.get("status", "UNKNOWN"), "violations": len(data.get("violations", []))}
     return {}
 
 
